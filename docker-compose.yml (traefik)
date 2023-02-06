@@ -1,0 +1,79 @@
+version: "3.3"
+
+services:
+  traefik:
+    image: "traefik:v2.6"
+    container_name: "trae"
+    command:
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.directory=/etc/docker/projects/traefik"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=MY@EMAIL"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "traefik.http.routers.redirect-https.middlewares=redirect-to-https"  
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`CNAME.MYDOMAINE.COM`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls.certresolver=myresolver"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.middlewares=auth-middleware"
+      - "traefik.http.middlewares.auth-middleware.basicauth.usersfile=/users_credentials"
+      - "traefik.http.middlewares.crowdsec-bouncer.forwardauth.address=http://crowdsec-bouncer:8080/api/v1/forwardAuth"
+      - "traefik.http.middlewares.crowdsec-bouncer.forwardauth.trustForwardHeader=true"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - ".:/etc/traefik"
+      - "./users_credentials:/users_credentials:ro"
+    networks:
+      - web
+
+  whoami:
+    image: "traefik/whoami"
+    container_name: "simple-service"
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.simple-service.rule=Host(`CNAME.MYDOMAINE.COM`)"
+      - "traefik.http.routers.simple-service.entrypoints=websecure"
+      - "traefik.http.routers.simple-service.tls.certresolver=myresolver"
+      - "traefik.http.routers.simple-service.middlewares=auth-middleware"
+      - "traefik.http.middlewares.auth-middleware.basicauth.usersfile=/users_credentials"
+
+  portainer:
+    container_name: portainer
+    image: portainer/portainer
+    restart: unless-stopped
+    networks:
+      - web
+    volumes:
+      - data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=Host(`CNAME.MYDOMAINE.COM`)"
+      - "traefik.http.routers.portainer.entrypoints=websecure"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+      - "traefik.http.routers.portainer.tls.certresolver=myresolver"
+networks:
+  web:
+    external:
+      name: web
+
+volumes:
+  data:
+
