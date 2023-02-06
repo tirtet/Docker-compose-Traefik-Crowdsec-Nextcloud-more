@@ -1,0 +1,60 @@
+ersion: '3.7'
+
+services:
+  db:
+    image: mariadb:latest
+    container_name: nextcloud-db
+    volumes:
+      - nextcloud-db-data:/var/lib/mysql
+    networks:
+      - web
+    restart: always
+    environment:
+      TZ: UTC
+      MYSQL_ROOT_PASSWORD: YOUR_PASSWD
+      MYSQL_DATABASE: db
+      MYSQL_USER: USER
+      MYSQL_PASSWORD: YOUR_PASSWD
+
+  redis:
+    image: redis:latest
+    restart: always
+    networks:
+      - web
+    volumes:
+      - redis:/var/lib/redis
+
+  nextcloud:
+    depends_on:
+      - redis
+      - db
+    image: nextcloud:stable 
+    container_name: nextcloud
+    volumes:
+      - ./files:/var/www/html
+    networks:
+      - web
+      
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cloud.rule=Host(`CNAME.YOURDOMAINE.COM`)"
+      - "traefik.http.routers.cloud.entrypoints=websecure"
+      - "traefik.http.routers.cloud.tls.certresolver=myresolver"
+    environment:
+      REDIS_HOST: redis
+      MYSQL_HOST: db:3306
+      MYSQL_DATABASE: db
+      MYSQL_USER: USER
+      MYSQL_PASSWORD: YOUR_PASSWD
+
+networks:
+  web:
+    external:
+      name: web
+    
+volumes:
+  nextcloud-db-data:
+    name: nextcloud-db-data
+  redis:
+    name: nextcloud-redis
