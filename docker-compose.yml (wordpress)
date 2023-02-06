@@ -1,0 +1,44 @@
+version: "2"
+
+services:
+   wordpress-db:
+     container_name: wordpress-db
+     image: mysql:5.7
+     volumes:
+       - /apps/wordpress/db:/var/lib/mysql
+     restart: always
+     environment:
+       MYSQL_ROOT_PASSWORD: YOUR_PASSWD
+       MYSQL_DATABASE: wordpress
+       MYSQL_USER: USER
+       MYSQL_PASSWORD: YOUR_PASSWD
+
+     networks:
+       - web
+
+   wordpress:
+     container_name: wordpress
+     depends_on:
+       - wordpress-db
+     image: wordpress
+     restart: always
+     volumes:
+       - /apps/wordpress/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+       - /apps/wordpress/html:/var/www/html
+     environment:
+       WORDPRESS_DB_HOST: wordpress-db
+       WORDPRESS_DB_USER: USER
+       WORDPRESS_DB_PASSWORD: YOUR_PASSWD
+       WORDPRESS_DB_NAME: wordpress
+     networks:
+       - web
+     labels:
+       - "traefik.enable=true"
+       - "traefik.http.routers.wordpress.rule=Host(`CNAME.YOURDOMAINE.COM`)"
+       - "traefik.http.routers.wordpress.entrypoints=websecure"
+       - "traefik.http.routers.wordpress.tls.certresolver=myresolver"
+       - "traefik.http.services.wordpress.loadbalancer.server.port=80"
+       - "traefik.docker.network=web"
+networks:
+  web:
+    external: true
